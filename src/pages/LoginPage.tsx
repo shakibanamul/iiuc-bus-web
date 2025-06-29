@@ -15,13 +15,7 @@ const LoginPage: React.FC = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
-  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
-  const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState('');
-  const [forgotPasswordError, setForgotPasswordError] = useState('');
-  const [showSetupGuide, setShowSetupGuide] = useState(false);
-  const [googleConfigStatus, setGoogleConfigStatus] = useState<'checking' | 'available' | 'needs-setup'>('checking');
+  const [googleConfigStatus, setGoogleConfigStatus] = useState<'checking' | 'available' | 'needs-setup'>('available'); // Default to available since you have it configured
   const [oauthSuccess, setOauthSuccess] = useState(false);
 
   // Check for OAuth callback errors or success
@@ -40,7 +34,6 @@ const LoginPage: React.FC = () => {
       } else if (errorParam === 'unauthorized_client') {
         setError('Google Sign-In configuration issue. Please contact the administrator.');
         setGoogleConfigStatus('needs-setup');
-        setShowSetupGuide(true);
       } else {
         setError(`Google Sign-In error: ${errorDescription || errorParam}`);
       }
@@ -58,21 +51,6 @@ const LoginPage: React.FC = () => {
       }, 2000);
     }
   }, [searchParams]);
-
-  // Check Google OAuth configuration on component mount
-  useEffect(() => {
-    const checkGoogleConfig = async () => {
-      try {
-        const { isConfigured } = await checkGoogleOAuthConfig();
-        setGoogleConfigStatus(isConfigured ? 'available' : 'needs-setup');
-      } catch (error) {
-        console.error('Error checking Google config:', error);
-        setGoogleConfigStatus('needs-setup');
-      }
-    };
-
-    checkGoogleConfig();
-  }, []);
 
   // Auto-hide OAuth success message
   useEffect(() => {
@@ -172,7 +150,6 @@ const LoginPage: React.FC = () => {
         setError(error.message);
         
         if (needsSetup) {
-          setShowSetupGuide(true);
           setGoogleConfigStatus('needs-setup');
         }
       } else if (data) {
@@ -302,17 +279,6 @@ const LoginPage: React.FC = () => {
                       </div>
                     </div>
                   )}
-
-                  {/* OAuth specific errors */}
-                  {error.includes('Google Sign-In') && !error.includes('cancelled') && (
-                    <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 sm:p-4 flex items-start space-x-3">
-                      <Settings className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500 flex-shrink-0 mt-0.5" />
-                      <div className="text-sm text-purple-700">
-                        <p className="font-medium mb-1">Google Sign-In Issue</p>
-                        <p className="text-xs sm:text-sm">There was a problem with Google authentication. Please try email/password login instead.</p>
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -359,7 +325,7 @@ const LoginPage: React.FC = () => {
                     <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3 border border-blue-200">
                       <div className="flex items-center space-x-2 mb-2">
                         <CheckCircle className="h-4 w-4 text-blue-600" />
-                        <span className="text-sm font-medium text-blue-900">Google Sign-In Active</span>
+                        <span className="text-sm font-medium text-blue-900">Google Sign-In Ready</span>
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-xs text-blue-700">
                         <div className="flex items-center space-x-1">
@@ -388,23 +354,8 @@ const LoginPage: React.FC = () => {
                       <div className="text-sm text-orange-800">
                         <p className="font-medium mb-2">⚙️ Google Sign-In Setup Required</p>
                         <p className="mb-3 leading-relaxed">
-                          Google Sign-In is not configured yet. The administrator needs to set up Google OAuth in Supabase to enable this feature.
+                          Google Sign-In needs to be configured. Please check your Supabase settings.
                         </p>
-                        <div className="bg-white/50 rounded-lg p-3 mb-3">
-                          <p className="font-medium text-xs mb-2">🔧 Common Issues & Solutions:</p>
-                          <ul className="text-xs space-y-1 list-disc list-inside">
-                            <li>Redirect URL mismatch in Google Console</li>
-                            <li>Missing Google OAuth credentials in Supabase</li>
-                            <li>Incorrect domain configuration</li>
-                            <li>Google OAuth provider not enabled</li>
-                          </ul>
-                        </div>
-                        <button
-                          onClick={() => setShowSetupGuide(!showSetupGuide)}
-                          className="text-orange-600 hover:text-orange-700 font-medium text-xs underline"
-                        >
-                          {showSetupGuide ? 'Hide' : 'Show'} Setup Instructions
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -511,71 +462,13 @@ const LoginPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Google Setup Guide - Mobile Optimized */}
-            {showSetupGuide && (
-              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-purple-200 mb-6">
-                <div className="flex items-start space-x-3">
-                  <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm text-purple-800">
-                    <p className="font-semibold mb-2 flex items-center space-x-2">
-                      <span>🔧 For Administrators - Google OAuth Setup</span>
-                    </p>
-                    <p className="text-xs mb-3">To enable Google Sign-In, configure these settings in Supabase:</p>
-                    
-                    <div className="bg-white/50 rounded-lg p-3 mb-3">
-                      <p className="font-medium text-xs mb-2">📋 Step-by-Step Setup:</p>
-                      <ol className="text-xs space-y-1 list-decimal list-inside">
-                        <li>Open your Supabase Dashboard</li>
-                        <li>Go to Authentication → Providers</li>
-                        <li>Enable Google provider</li>
-                        <li>Get Google OAuth credentials from Google Cloud Console</li>
-                        <li>Add Client ID and Client Secret to Supabase</li>
-                        <li>Configure redirect URLs: <code className="bg-gray-200 px-1 rounded text-xs">{window.location.origin}/login</code></li>
-                        <li>Test the integration</li>
-                      </ol>
-                    </div>
-                    
-                    <div className="bg-yellow-50 rounded-lg p-3 mb-3 border border-yellow-200">
-                      <p className="font-medium text-xs mb-2">⚠️ Common Redirect URL Issues:</p>
-                      <ul className="text-xs space-y-1">
-                        <li>• Make sure redirect URL in Google Console matches: <code className="bg-gray-200 px-1 rounded text-xs">{window.location.origin}/login</code></li>
-                        <li>• Check that the domain is authorized in Google Console</li>
-                        <li>• Verify Supabase site URL matches your domain</li>
-                      </ul>
-                    </div>
-                    
-                    <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                      <a
-                        href="https://supabase.com/docs/guides/auth/social-login/auth-google"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center space-x-1 text-xs text-purple-600 hover:text-purple-700 font-medium"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        <span>Google OAuth Docs</span>
-                      </a>
-                      <a
-                        href="https://supabase.com/dashboard"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center space-x-1 text-xs text-purple-600 hover:text-purple-700 font-medium"
-                      >
-                        <Settings className="h-3 w-3" />
-                        <span>Supabase Dashboard</span>
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Success Notice - Mobile Optimized */}
             <div className="bg-green-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-green-200 mb-6">
               <div className="flex items-start space-x-3">
                 <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 flex-shrink-0 mt-0.5" />
                 <div className="text-sm text-green-700">
-                  <p className="font-semibold mb-1">Just Verified Your Email?</p>
-                  <p className="text-xs sm:text-sm">Perfect! You can now sign in with your credentials{googleConfigStatus === 'available' ? ' or use Google Sign-In for instant access' : ''}.</p>
+                  <p className="font-semibold mb-1">Ready to Sign In!</p>
+                  <p className="text-xs sm:text-sm">Use your credentials or Google Sign-In for instant access to your IIUC Bus Dashboard.</p>
                 </div>
               </div>
             </div>
