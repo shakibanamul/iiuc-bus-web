@@ -31,8 +31,17 @@ const LoginPage: React.FC = () => {
     
     if (errorParam) {
       console.error('OAuth error:', errorParam, errorDescription);
-      setError(`OAuth Error: ${errorDescription || errorParam}`);
-      setGoogleConfigStatus('needs-setup');
+      
+      // Only show setup guide for actual configuration errors, not user cancellations
+      if (errorParam === 'access_denied') {
+        setError('Google Sign-In was cancelled. Please try again or use email/password login.');
+      } else if (errorParam === 'unauthorized_client') {
+        setError('Google Sign-In configuration issue. Please contact the administrator.');
+        setGoogleConfigStatus('needs-setup');
+        setShowSetupGuide(true);
+      } else {
+        setError(`Google Sign-In error: ${errorDescription || errorParam}`);
+      }
       
       // Clear URL parameters
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -259,7 +268,7 @@ const LoginPage: React.FC = () => {
                   )}
 
                   {/* OAuth specific errors */}
-                  {error.includes('OAuth') && (
+                  {error.includes('Google Sign-In') && !error.includes('cancelled') && (
                     <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 sm:p-4 flex items-start space-x-3">
                       <Settings className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500 flex-shrink-0 mt-0.5" />
                       <div className="text-sm text-purple-700">
