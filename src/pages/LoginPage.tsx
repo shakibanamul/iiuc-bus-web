@@ -22,12 +22,14 @@ const LoginPage: React.FC = () => {
   const [forgotPasswordError, setForgotPasswordError] = useState('');
   const [showSetupGuide, setShowSetupGuide] = useState(false);
   const [googleConfigStatus, setGoogleConfigStatus] = useState<'checking' | 'available' | 'needs-setup'>('checking');
+  const [oauthSuccess, setOauthSuccess] = useState(false);
 
   // Check for OAuth callback errors or success
   useEffect(() => {
     const errorParam = searchParams.get('error');
     const errorDescription = searchParams.get('error_description');
     const accessToken = searchParams.get('access_token');
+    const code = searchParams.get('code');
     
     if (errorParam) {
       console.error('OAuth error:', errorParam, errorDescription);
@@ -45,9 +47,11 @@ const LoginPage: React.FC = () => {
       
       // Clear URL parameters
       window.history.replaceState({}, document.title, window.location.pathname);
-    } else if (accessToken) {
+    } else if (accessToken || code) {
       console.log('OAuth success detected, processing...');
-      // The AuthContext will handle the OAuth callback
+      setOauthSuccess(true);
+      setIsGoogleLoading(true);
+      
       // Clear URL parameters after a short delay
       setTimeout(() => {
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -69,6 +73,17 @@ const LoginPage: React.FC = () => {
 
     checkGoogleConfig();
   }, []);
+
+  // Auto-hide OAuth success message
+  useEffect(() => {
+    if (oauthSuccess) {
+      const timer = setTimeout(() => {
+        setOauthSuccess(false);
+        setIsGoogleLoading(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [oauthSuccess]);
 
   // Show loading spinner while auth is initializing
   if (loading) {
@@ -237,8 +252,29 @@ const LoginPage: React.FC = () => {
             {/* Login Form - Mobile-First Design */}
             <div className="bg-white/90 backdrop-blur-sm rounded-2xl sm:rounded-3xl shadow-xl border border-gray-200/50 p-6 sm:p-8 mb-6">
               
+              {/* OAuth Success Message */}
+              {oauthSuccess && (
+                <div className="mb-6 bg-green-50 border border-green-200 rounded-xl p-4 animate-fade-slide-up">
+                  <div className="flex items-center space-x-3">
+                    <div className="bg-green-500 rounded-full p-2">
+                      <CheckCircle className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="text-sm text-green-700">
+                      <p className="font-semibold mb-1">🎉 Google Sign-In Successful!</p>
+                      <p>You're being logged in automatically. Please wait...</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 bg-green-100 rounded-lg p-2">
+                    <div className="flex items-center space-x-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-green-600" />
+                      <span className="text-xs text-green-600 font-medium">Processing authentication...</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Error Message - Mobile Optimized */}
-              {error && (
+              {error && !oauthSuccess && (
                 <div className="space-y-3 mb-6">
                   <div className="bg-red-50 border border-red-200 rounded-xl p-3 sm:p-4 flex items-start space-x-3">
                     <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-500 flex-shrink-0 mt-0.5" />
@@ -288,33 +324,63 @@ const LoginPage: React.FC = () => {
                     <span className="text-gray-500 text-sm">Checking Google Sign-In availability...</span>
                   </div>
                 ) : googleConfigStatus === 'available' ? (
-                  <button
-                    onClick={handleGoogleSignIn}
-                    disabled={isGoogleLoading || isLoading}
-                    className="w-full flex items-center justify-center space-x-3 px-4 sm:px-6 py-3 sm:py-4 bg-white border-2 border-gray-200 rounded-xl sm:rounded-2xl hover:border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md text-base button-smooth group"
-                  >
-                    {isGoogleLoading ? (
-                      <>
-                        <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
-                        <span className="text-gray-600 font-medium">Signing in with Google...</span>
-                      </>
-                    ) : (
-                      <>
-                        {/* Google Icon */}
-                        <svg className="h-5 w-5 group-hover:scale-110 transition-transform duration-200" viewBox="0 0 24 24">
-                          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                        </svg>
-                        <span className="text-gray-700 font-medium">Continue with Google</span>
+                  <div className="space-y-3">
+                    <button
+                      onClick={handleGoogleSignIn}
+                      disabled={isGoogleLoading || isLoading || oauthSuccess}
+                      className="w-full flex items-center justify-center space-x-3 px-4 sm:px-6 py-3 sm:py-4 bg-white border-2 border-gray-200 rounded-xl sm:rounded-2xl hover:border-gray-300 hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md text-base button-smooth group"
+                    >
+                      {isGoogleLoading || oauthSuccess ? (
+                        <>
+                          <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
+                          <span className="text-gray-600 font-medium">
+                            {oauthSuccess ? 'Processing Google Sign-In...' : 'Signing in with Google...'}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          {/* Google Icon */}
+                          <svg className="h-5 w-5 group-hover:scale-110 transition-transform duration-200" viewBox="0 0 24 24">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                          </svg>
+                          <span className="text-gray-700 font-medium">Continue with Google</span>
+                          <div className="flex items-center space-x-1">
+                            <Sparkles className="h-3 w-3 text-blue-500" />
+                            <span className="text-xs text-gray-500">Instant</span>
+                          </div>
+                        </>
+                      )}
+                    </button>
+
+                    {/* Google Sign-In Benefits */}
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3 border border-blue-200">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <CheckCircle className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm font-medium text-blue-900">Google Sign-In Active</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs text-blue-700">
                         <div className="flex items-center space-x-1">
-                          <Star className="h-3 w-3 text-yellow-500" />
-                          <span className="text-xs text-gray-500">Fast</span>
+                          <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                          <span>Instant access</span>
                         </div>
-                      </>
-                    )}
-                  </button>
+                        <div className="flex items-center space-x-1">
+                          <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                          <span>Secure login</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                          <span>No password needed</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                          <span>Auto account setup</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
                     <div className="flex items-start space-x-3">
@@ -372,7 +438,7 @@ const LoginPage: React.FC = () => {
                       placeholder="Enter your email or university ID"
                       className="w-full pl-10 sm:pl-12 pr-4 py-3 sm:py-4 border-2 border-gray-200 rounded-xl sm:rounded-2xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-gray-900 placeholder-gray-500 text-base form-input"
                       required
-                      disabled={isLoading || isGoogleLoading}
+                      disabled={isLoading || isGoogleLoading || oauthSuccess}
                       autoComplete="username"
                       autoCapitalize="none"
                       autoCorrect="off"
@@ -396,14 +462,14 @@ const LoginPage: React.FC = () => {
                       placeholder="Enter your password"
                       className="w-full pl-10 sm:pl-12 pr-12 sm:pr-14 py-3 sm:py-4 border-2 border-gray-200 rounded-xl sm:rounded-2xl focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 text-gray-900 placeholder-gray-500 text-base form-input"
                       required
-                      disabled={isLoading || isGoogleLoading}
+                      disabled={isLoading || isGoogleLoading || oauthSuccess}
                       autoComplete="current-password"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 sm:right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1"
-                      disabled={isLoading || isGoogleLoading}
+                      disabled={isLoading || isGoogleLoading || oauthSuccess}
                       tabIndex={-1}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4 sm:h-5 sm:w-5" /> : <Eye className="h-4 w-4 sm:h-5 sm:w-5" />}
@@ -414,7 +480,7 @@ const LoginPage: React.FC = () => {
                 {/* Submit Button - Mobile Optimized */}
                 <button
                   type="submit"
-                  disabled={isLoading || isGoogleLoading}
+                  disabled={isLoading || isGoogleLoading || oauthSuccess}
                   className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold py-3 sm:py-4 px-6 rounded-xl sm:rounded-2xl transition-all duration-200 shadow-lg hover:shadow-xl disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-base button-smooth"
                 >
                   {isLoading ? (
@@ -503,46 +569,13 @@ const LoginPage: React.FC = () => {
               </div>
             )}
 
-            {/* Google Sign-In Benefits - Mobile Optimized */}
-            {googleConfigStatus === 'available' && (
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-green-200 mb-6">
-                <h3 className="font-semibold text-green-900 mb-3 text-center text-sm sm:text-base flex items-center justify-center space-x-2">
-                  <svg className="h-4 w-4" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                  </svg>
-                  <span>Why Use Google Sign-In?</span>
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm text-green-700">
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                    <span>No password to remember</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                    <span>Instant account creation</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                    <span>Enhanced security</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                    <span>One-click access</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Success Notice - Mobile Optimized */}
             <div className="bg-green-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-green-200 mb-6">
               <div className="flex items-start space-x-3">
                 <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 flex-shrink-0 mt-0.5" />
                 <div className="text-sm text-green-700">
                   <p className="font-semibold mb-1">Just Verified Your Email?</p>
-                  <p className="text-xs sm:text-sm">Perfect! You can now sign in with your credentials{googleConfigStatus === 'available' ? ' or use Google Sign-In' : ''}.</p>
+                  <p className="text-xs sm:text-sm">Perfect! You can now sign in with your credentials{googleConfigStatus === 'available' ? ' or use Google Sign-In for instant access' : ''}.</p>
                 </div>
               </div>
             </div>

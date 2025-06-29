@@ -52,6 +52,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const accessToken = urlParams.get('access_token');
         const refreshToken = urlParams.get('refresh_token');
         const oauthError = urlParams.get('error');
+        const code = urlParams.get('code');
         
         if (oauthError) {
           console.error('❌ OAuth error in URL:', oauthError);
@@ -63,7 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
         
-        if (accessToken) {
+        if (accessToken || code) {
           console.log('🔗 OAuth callback detected, handling...');
           
           try {
