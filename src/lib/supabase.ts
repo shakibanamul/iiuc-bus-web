@@ -64,7 +64,7 @@ export const checkGoogleOAuthConfig = async (): Promise<{ isConfigured: boolean;
   }
 };
 
-// Enhanced Google Sign-In function
+// Enhanced Google Sign-In function with better redirect handling
 export const signInWithGoogle = async (): Promise<{ data?: any; error?: any; needsSetup?: boolean }> => {
   try {
     console.log('🔐 Attempting Google Sign-In...');
@@ -78,15 +78,22 @@ export const signInWithGoogle = async (): Promise<{ data?: any; error?: any; nee
       };
     }
 
-    // Attempt Google OAuth sign-in
+    // Get the current origin for redirect URL
+    const currentOrigin = window.location.origin;
+    const redirectTo = `${currentOrigin}/login`;
+
+    console.log('🔗 Redirect URL:', redirectTo);
+
+    // Attempt Google OAuth sign-in with proper redirect URL
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/login?google=success`,
+        redirectTo: redirectTo,
         queryParams: {
           access_type: 'offline',
           prompt: 'consent',
         },
+        skipBrowserRedirect: false, // Allow browser redirect
       }
     });
 
@@ -134,6 +141,28 @@ export const signInWithGoogle = async (): Promise<{ data?: any; error?: any; nee
         message: 'An unexpected error occurred with Google Sign-In. Please try again or use email/password login.' 
       }
     };
+  }
+};
+
+// Handle OAuth callback
+export const handleOAuthCallback = async () => {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    
+    if (error) {
+      console.error('❌ OAuth callback error:', error);
+      return { error };
+    }
+
+    if (data.session) {
+      console.log('✅ OAuth callback successful');
+      return { data };
+    }
+
+    return { error: { message: 'No session found after OAuth callback' } };
+  } catch (error: any) {
+    console.error('❌ OAuth callback handling error:', error);
+    return { error: { message: 'Failed to handle OAuth callback' } };
   }
 };
 

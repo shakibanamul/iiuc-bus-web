@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
-import { supabase, User } from '../lib/supabase';
+import { supabase, User, handleOAuthCallback } from '../lib/supabase';
 
 interface AuthContextType {
   user: SupabaseUser | null;
@@ -46,11 +46,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           return;
         }
+
+        // Check for OAuth callback in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const accessToken = urlParams.get('access_token');
+        const refreshToken = urlParams.get('refresh_token');
+        
+        if (accessToken) {
+          console.log('🔗 OAuth callback detected, handling...');
+          
+          try {
+            // Handle OAuth callback
+            const { data, error } = await handleOAuthCallback();
+            
+            if (error) {
+              console.error('❌ OAuth callback error:', error);
+              // Clear URL parameters and redirect to login with error
+              window.history.replaceState({}, document.title, window.location.pathname);
+              if (mounted) {
+                setLoading(false);
+              }
+              return;
+            }
+
+            if (data?.session) {
+              console.log('✅ OAuth login successful');
+              // Clear URL parameters
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
+          } catch (oauthError) {
+            console.error('❌ OAuth handling failed:', oauthError);
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        }
         
         // Get initial session with increased timeout
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Session timeout')), 8000) // Increased from 2000 to 8000ms
+          setTimeout(() => reject(new Error('Session timeout')), 8000)
         );
         
         const { data: { session }, error } = await Promise.race([
@@ -95,7 +128,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('⏰ Auth initialization timeout - forcing load completion');
         setLoading(false);
       }
-    }, 10000); // Increased from 1500 to 10000ms
+    }, 10000);
 
     initializeAuth();
 
@@ -141,7 +174,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .maybeSingle();
         
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Profile fetch timeout')), 10000) // Increased from 3000 to 10000ms
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
       );
 
       const { data, error } = await Promise.race([
@@ -187,7 +220,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const profileData = {
         id: userId,
         email: user.email!,
-        name: metadata.name || 'User',
+        name: metadata.name || user.email?.split('@')[0] || 'User',
         university_id: metadata.university_id || `TEMP_${userId.substring(0, 8)}`,
         mobile: metadata.mobile || '',
         gender: metadata.gender || 'Male',

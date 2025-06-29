@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { signInWithGoogle, checkGoogleOAuthConfig } from '../lib/supabase';
 import { Bus, Lock, User, Eye, EyeOff, AlertCircle, Loader2, Mail, CheckCircle, Wifi, WifiOff, ArrowLeft, Sparkles, Key, Info, Settings, ExternalLink, Shield, Globe, Star } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
   const { signIn, user, userProfile, loading } = useAuth();
+  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState({
     identifier: '', // Can be email or university ID
     password: '',
@@ -21,6 +22,21 @@ const LoginPage: React.FC = () => {
   const [forgotPasswordError, setForgotPasswordError] = useState('');
   const [showSetupGuide, setShowSetupGuide] = useState(false);
   const [googleConfigStatus, setGoogleConfigStatus] = useState<'checking' | 'available' | 'needs-setup'>('checking');
+
+  // Check for OAuth callback errors
+  useEffect(() => {
+    const errorParam = searchParams.get('error');
+    const errorDescription = searchParams.get('error_description');
+    
+    if (errorParam) {
+      console.error('OAuth error:', errorParam, errorDescription);
+      setError(`OAuth Error: ${errorDescription || errorParam}`);
+      setGoogleConfigStatus('needs-setup');
+      
+      // Clear URL parameters
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [searchParams]);
 
   // Check Google OAuth configuration on component mount
   useEffect(() => {
@@ -125,6 +141,7 @@ const LoginPage: React.FC = () => {
         
         if (needsSetup) {
           setShowSetupGuide(true);
+          setGoogleConfigStatus('needs-setup');
         }
       } else if (data) {
         console.log('✅ Google sign-in initiated successfully');
@@ -232,6 +249,17 @@ const LoginPage: React.FC = () => {
                       </div>
                     </div>
                   )}
+
+                  {/* OAuth specific errors */}
+                  {error.includes('OAuth') && (
+                    <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 sm:p-4 flex items-start space-x-3">
+                      <Settings className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-purple-700">
+                        <p className="font-medium mb-1">Google Sign-In Issue</p>
+                        <p className="text-xs sm:text-sm">There was a problem with Google authentication. Please try email/password login instead.</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -279,6 +307,15 @@ const LoginPage: React.FC = () => {
                         <p className="mb-3 leading-relaxed">
                           Google Sign-In is not configured yet. The administrator needs to set up Google OAuth in Supabase to enable this feature.
                         </p>
+                        <div className="bg-white/50 rounded-lg p-3 mb-3">
+                          <p className="font-medium text-xs mb-2">🔧 Common Issues & Solutions:</p>
+                          <ul className="text-xs space-y-1 list-disc list-inside">
+                            <li>Redirect URL mismatch in Google Console</li>
+                            <li>Missing Google OAuth credentials in Supabase</li>
+                            <li>Incorrect domain configuration</li>
+                            <li>Google OAuth provider not enabled</li>
+                          </ul>
+                        </div>
                         <button
                           onClick={() => setShowSetupGuide(!showSetupGuide)}
                           className="text-orange-600 hover:text-orange-700 font-medium text-xs underline"
@@ -410,9 +447,18 @@ const LoginPage: React.FC = () => {
                         <li>Enable Google provider</li>
                         <li>Get Google OAuth credentials from Google Cloud Console</li>
                         <li>Add Client ID and Client Secret to Supabase</li>
-                        <li>Configure redirect URLs</li>
+                        <li>Configure redirect URLs: <code className="bg-gray-200 px-1 rounded text-xs">{window.location.origin}/login</code></li>
                         <li>Test the integration</li>
                       </ol>
+                    </div>
+                    
+                    <div className="bg-yellow-50 rounded-lg p-3 mb-3 border border-yellow-200">
+                      <p className="font-medium text-xs mb-2">⚠️ Common Redirect URL Issues:</p>
+                      <ul className="text-xs space-y-1">
+                        <li>• Make sure redirect URL in Google Console matches: <code className="bg-gray-200 px-1 rounded text-xs">{window.location.origin}/login</code></li>
+                        <li>• Check that the domain is authorized in Google Console</li>
+                        <li>• Verify Supabase site URL matches your domain</li>
+                      </ul>
                     </div>
                     
                     <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
