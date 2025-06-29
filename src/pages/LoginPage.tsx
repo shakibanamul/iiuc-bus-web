@@ -23,10 +23,11 @@ const LoginPage: React.FC = () => {
   const [showSetupGuide, setShowSetupGuide] = useState(false);
   const [googleConfigStatus, setGoogleConfigStatus] = useState<'checking' | 'available' | 'needs-setup'>('checking');
 
-  // Check for OAuth callback errors
+  // Check for OAuth callback errors or success
   useEffect(() => {
     const errorParam = searchParams.get('error');
     const errorDescription = searchParams.get('error_description');
+    const accessToken = searchParams.get('access_token');
     
     if (errorParam) {
       console.error('OAuth error:', errorParam, errorDescription);
@@ -35,6 +36,13 @@ const LoginPage: React.FC = () => {
       
       // Clear URL parameters
       window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (accessToken) {
+      console.log('OAuth success detected, processing...');
+      // The AuthContext will handle the OAuth callback
+      // Clear URL parameters after a short delay
+      setTimeout(() => {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }, 2000);
     }
   }, [searchParams]);
 

@@ -78,11 +78,11 @@ export const signInWithGoogle = async (): Promise<{ data?: any; error?: any; nee
       };
     }
 
-    // Get the current origin for redirect URL
+    // Get the current origin and construct proper redirect URL
     const currentOrigin = window.location.origin;
     const redirectTo = `${currentOrigin}/login`;
 
-    console.log('🔗 Redirect URL:', redirectTo);
+    console.log('🔗 Using redirect URL:', redirectTo);
 
     // Attempt Google OAuth sign-in with proper redirect URL
     const { data, error } = await supabase.auth.signInWithOAuth({
@@ -144,14 +144,58 @@ export const signInWithGoogle = async (): Promise<{ data?: any; error?: any; nee
   }
 };
 
-// Handle OAuth callback
+// Handle OAuth callback with better error handling
 export const handleOAuthCallback = async () => {
   try {
-    const { data, error } = await supabase.auth.getSession();
+    console.log('🔄 Processing OAuth callback...');
     
+    // Check URL for OAuth parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const accessToken = urlParams.get('access_token');
+    const refreshToken = urlParams.get('refresh_token');
+    const error = urlParams.get('error');
+    const errorDescription = urlParams.get('error_description');
+
+    // Handle OAuth errors in URL
     if (error) {
-      console.error('❌ OAuth callback error:', error);
-      return { error };
+      console.error('❌ OAuth URL error:', error, errorDescription);
+      return { 
+        error: { 
+          message: `OAuth Error: ${errorDescription || error}`,
+          type: 'oauth_error'
+        } 
+      };
+    }
+
+    // If we have tokens in URL, try to get session
+    if (accessToken) {
+      console.log('🔗 OAuth tokens found in URL, getting session...');
+      
+      // Wait a bit for Supabase to process the OAuth callback
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('❌ Session error after OAuth:', sessionError);
+        return { error: sessionError };
+      }
+
+      if (data.session) {
+        console.log('✅ OAuth session established successfully');
+        return { data };
+      } else {
+        console.warn('⚠️ No session found after OAuth callback');
+        return { error: { message: 'Authentication completed but no session was created. Please try logging in again.' } };
+      }
+    }
+
+    // Fallback: just try to get current session
+    const { data, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError) {
+      console.error('❌ OAuth callback session error:', sessionError);
+      return { error: sessionError };
     }
 
     if (data.session) {

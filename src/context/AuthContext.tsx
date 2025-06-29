@@ -47,10 +47,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
 
-        // Check for OAuth callback in URL
+        // Check for OAuth callback in URL first
         const urlParams = new URLSearchParams(window.location.search);
         const accessToken = urlParams.get('access_token');
         const refreshToken = urlParams.get('refresh_token');
+        const oauthError = urlParams.get('error');
+        
+        if (oauthError) {
+          console.error('❌ OAuth error in URL:', oauthError);
+          // Clear URL parameters and show error
+          window.history.replaceState({}, document.title, window.location.pathname);
+          if (mounted) {
+            setLoading(false);
+          }
+          return;
+        }
         
         if (accessToken) {
           console.log('🔗 OAuth callback detected, handling...');
@@ -61,7 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             if (error) {
               console.error('❌ OAuth callback error:', error);
-              // Clear URL parameters and redirect to login with error
+              // Clear URL parameters
               window.history.replaceState({}, document.title, window.location.pathname);
               if (mounted) {
                 setLoading(false);
@@ -73,6 +84,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               console.log('✅ OAuth login successful');
               // Clear URL parameters
               window.history.replaceState({}, document.title, window.location.pathname);
+              
+              if (mounted) {
+                setUser(data.session.user);
+                if (data.session.user.email_confirmed_at) {
+                  await fetchUserProfile(data.session.user.id);
+                } else {
+                  setLoading(false);
+                }
+              }
+              return;
             }
           } catch (oauthError) {
             console.error('❌ OAuth handling failed:', oauthError);
@@ -217,10 +238,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const metadata = user.user_metadata || {};
       
+      // For Google OAuth users, extract name from email if not provided
+      const displayName = metadata.name || 
+                         metadata.full_name || 
+                         user.email?.split('@')[0] || 
+                         'User';
+      
       const profileData = {
         id: userId,
         email: user.email!,
-        name: metadata.name || user.email?.split('@')[0] || 'User',
+        name: displayName,
         university_id: metadata.university_id || `TEMP_${userId.substring(0, 8)}`,
         mobile: metadata.mobile || '',
         gender: metadata.gender || 'Male',
